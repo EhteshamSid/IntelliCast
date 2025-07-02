@@ -1,4 +1,5 @@
 openai
 python-dotenv
 requests
-wikipedia
+wikipedia 
+streamlit

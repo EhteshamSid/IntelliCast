@@ -8,6 +8,8 @@ import time
 import logging
 import wikipedia
 import concurrent.futures
+import streamlit as st
+from bs4 import BeautifulSoup, Tag
 
 load_dotenv()
 
@@ -34,18 +36,22 @@ def try_api_call(api_func, query, max_retries=2, backoff_factor=2):
 
 # --- News APIs ---
 def fetch_from_newsapi(query):
+    print("[DEBUG] Hitting NewsAPI with query:", query)
     api_key = os.getenv("NEWSAPI_KEY")
     if not api_key:
         logging.error("NEWSAPI_KEY not set.")
+        print("[DEBUG] NewsAPI: API key not set.")
         return None
     url = f"https://newsapi.org/v2/everything?q={query}&language=en&sortBy=publishedAt&pageSize=5&apiKey={api_key}"
     try:
         resp = requests.get(url, timeout=5)
     except Exception as e:
         logging.error(f"NewsAPI request failed: {e}")
+        print("[DEBUG] NewsAPI: request failed.")
         return None
     if resp.status_code == 200:
         data = resp.json()
+        print("[DEBUG] NewsAPI returned results.")
         return [
             {
                 "title": a["title"],
@@ -57,24 +63,30 @@ def fetch_from_newsapi(query):
             for a in data.get("articles", [])
         ]
     elif resp.status_code == 429:
+        print("[DEBUG] NewsAPI: rate limit hit.")
         raise RateLimitException("NewsAPI rate limit hit.")
     else:
         logging.error(f"NewsAPI error: {resp.status_code} {resp.text}")
+        print(f"[DEBUG] NewsAPI error: {resp.status_code}")
     return None
 
 def fetch_from_guardian(query):
+    print("[DEBUG] Hitting Guardian API with query:", query)
     api_key = os.getenv("GUARDIAN_API_KEY")
     if not api_key:
         logging.error("GUARDIAN_API_KEY not set.")
+        print("[DEBUG] Guardian API: API key not set.")
         return None
     url = f"https://content.guardianapis.com/search?q={query}&api-key={api_key}&show-fields=all&page-size=5"
     try:
         resp = requests.get(url, timeout=5)
     except Exception as e:
         logging.error(f"Guardian API request failed: {e}")
+        print("[DEBUG] Guardian API: request failed.")
         return None
     if resp.status_code == 200:
         data = resp.json()
+        print("[DEBUG] Guardian API returned results.")
         return [
             {
                 "title": r['webTitle'],
@@ -86,15 +98,19 @@ def fetch_from_guardian(query):
             for r in data.get('response', {}).get('results', [])
         ]
     elif resp.status_code == 429:
+        print("[DEBUG] Guardian API: rate limit hit.")
         raise RateLimitException("Guardian API rate limit hit.")
     else:
         logging.error(f"Guardian API error: {resp.status_code} {resp.text}")
+        print(f"[DEBUG] Guardian API error: {resp.status_code}")
     return None
 
 def fetch_from_serper(query):
+    print("[DEBUG] Hitting Serper API with query:", query)
     api_key = os.getenv("SERPER_API_KEY")
     if not api_key:
         logging.error("SERPER_API_KEY not set.")
+        print("[DEBUG] Serper API: API key not set.")
         return None
     url = "https://google.serper.dev/news"
     headers = {"X-API-KEY": api_key, "Content-Type": "application/json"}
@@ -102,9 +118,11 @@ def fetch_from_serper(query):
         resp = requests.post(url, headers=headers, json={"q": query}, timeout=5)
     except Exception as e:
         logging.error(f"Serper API request failed: {e}")
+        print("[DEBUG] Serper API: request failed.")
         return None
     if resp.status_code == 200:
         data = resp.json()
+        print("[DEBUG] Serper API returned results.")
         return [
             {
                 "title": n["title"],
@@ -116,15 +134,19 @@ def fetch_from_serper(query):
             for n in data.get("news", [])
         ]
     elif resp.status_code == 429:
+        print("[DEBUG] Serper API: rate limit hit.")
         raise RateLimitException("Serper API rate limit hit.")
     else:
         logging.error(f"Serper API error: {resp.status_code} {resp.text}")
+        print(f"[DEBUG] Serper API error: {resp.status_code}")
     return None
 
 def fetch_from_brave(query):
+    print("[DEBUG] Hitting Brave API with query:", query)
     api_key = os.getenv("BRAVE_API_KEY")
     if not api_key:
         logging.error("BRAVE_API_KEY not set.")
+        print("[DEBUG] Brave API: API key not set.")
         return None
     url = f"https://api.search.brave.com/res/v1/news/search?q={query}&count=5"
     headers = {"Accept": "application/json", "X-Subscription-Token": api_key}
@@ -132,9 +154,11 @@ def fetch_from_brave(query):
         resp = requests.get(url, headers=headers, timeout=5)
     except Exception as e:
         logging.error(f"Brave API request failed: {e}")
+        print("[DEBUG] Brave API: request failed.")
         return None
     if resp.status_code == 200:
         data = resp.json()
+        print("[DEBUG] Brave API returned results.")
         return [
             {
                 "title": n["title"],
@@ -146,21 +170,23 @@ def fetch_from_brave(query):
             for n in data.get("results", [])
         ]
     elif resp.status_code == 429:
+        print("[DEBUG] Brave API: rate limit hit.")
         raise RateLimitException("Brave API rate limit hit.")
     else:
         logging.error(f"Brave API error: {resp.status_code} {resp.text}")
+        print(f"[DEBUG] Brave API error: {resp.status_code}")
     return None
 
 def fetch_from_wikipedia(query):
+    print("[DEBUG] Hitting Wikipedia with query:", query)
     try:
         results = wikipedia.search(query)
         if not results:
-            # print("Wikipedia: No results found.")
+            print("[DEBUG] Wikipedia: No results found.")
             return None
         page = wikipedia.page(results[0])
         summary = wikipedia.summary(results[0], sentences=2)
-        # print("Wikipedia page found:", page.title)
-        # print("Wikipedia summary:", summary)
+        print(f"[DEBUG] Wikipedia page found: {page.title}")
         return [{
             "title": page.title,
             "url": page.url,
@@ -170,6 +196,7 @@ def fetch_from_wikipedia(query):
         }]
     except Exception as e:
         logging.error(f"Wikipedia API error: {e}")
+        print(f"[DEBUG] Wikipedia API error: {e}")
         return None
 
 def fetch_news_articles(query: str):
@@ -192,63 +219,81 @@ def fetch_news_articles(query: str):
 
 # --- Government APIs ---
 def fetch_from_congress_gov(query):
+    print("[DEBUG] Hitting Congress.gov API with query:", query)
     api_key = os.getenv("CONGRESS_API_KEY")
     if not api_key:
         logging.error("CONGRESS_API_KEY not set.")
+        print("[DEBUG] Congress.gov API: API key not set.")
         return None
     url = f"https://api.congress.gov/v3/bill?query={query}&api_key={api_key}"
     try:
         resp = requests.get(url, timeout=5)
     except Exception as e:
         logging.error(f"Congress.gov API request failed: {e}")
+        print("[DEBUG] Congress.gov API: request failed.")
         return None
     if resp.status_code == 200:
         data = resp.json()
+        print("[DEBUG] Congress.gov API returned results.")
         return data.get("bills", [])
     elif resp.status_code == 429:
+        print("[DEBUG] Congress.gov API: rate limit hit.")
         raise RateLimitException("Congress.gov API rate limit hit.")
     else:
         logging.error(f"Congress.gov API error: {resp.status_code} {resp.text}")
+        print(f"[DEBUG] Congress.gov API error: {resp.status_code}")
     return None
 
 def fetch_from_govinfo(query):
+    print("[DEBUG] Hitting GovInfo API with query:", query)
     api_key = os.getenv("GOVINFO_API_KEY")
     if not api_key:
         logging.error("GOVINFO_API_KEY not set.")
+        print("[DEBUG] GovInfo API: API key not set.")
         return None
     url = f"https://api.govinfo.gov/collections/BILLS/{query}?api_key={api_key}"
     try:
         resp = requests.get(url, timeout=5)
     except Exception as e:
         logging.error(f"GovInfo API request failed: {e}")
+        print("[DEBUG] GovInfo API: request failed.")
         return None
     if resp.status_code == 200:
         data = resp.json()
+        print("[DEBUG] GovInfo API returned results.")
         return data.get("packages", [])
     elif resp.status_code == 429:
+        print("[DEBUG] GovInfo API: rate limit hit.")
         raise RateLimitException("GovInfo API rate limit hit.")
     else:
         logging.error(f"GovInfo API error: {resp.status_code} {resp.text}")
+        print(f"[DEBUG] GovInfo API error: {resp.status_code}")
     return None
 
 def fetch_from_fec(query):
+    print("[DEBUG] Hitting FEC API with query:", query)
     api_key = os.getenv("FEC_API_KEY")
     if not api_key:
         logging.error("FEC_API_KEY not set.")
+        print("[DEBUG] FEC API: API key not set.")
         return None
     url = f"https://api.open.fec.gov/v1/search/?api_key={api_key}&query={query}"
     try:
         resp = requests.get(url, timeout=5)
     except Exception as e:
         logging.error(f"FEC API request failed: {e}")
+        print("[DEBUG] FEC API: request failed.")
         return None
     if resp.status_code == 200:
         data = resp.json()
+        print("[DEBUG] FEC API returned results.")
         return data.get("results", [])
     elif resp.status_code == 429:
+        print("[DEBUG] FEC API: rate limit hit.")
         raise RateLimitException("FEC API rate limit hit.")
     else:
         logging.error(f"FEC API error: {resp.status_code} {resp.text}")
+        print(f"[DEBUG] FEC API error: {resp.status_code}")
     return None
 
 def fetch_legislation_data(query: str):
@@ -261,18 +306,27 @@ def fetch_legislation_data(query: str):
 
 # --- Classification ---
 def is_political_question(question: str) -> bool:
-    """
-    Heuristic to determine if a question is political.
-    Returns True if political, False otherwise.
-    """
+    # Single-word and multi-word keywords
     political_keywords = [
-        'election', 'congress', 'senate', 'house', 'president', 'republican', 'democrat',
-        'policy', 'government', 'law', 'bill', 'politics', 'campaign', 'vote', 'voting',
+        'election', 'elections', 'congress', 'senate', 'house', 'president', 'presidential',
+        'republican', 'democrat', 'policy', 'government', 'law', 'bill', 'bills', 'politics',
+        'campaign', 'campaigns', 'vote', 'voting', 'primary', 'primaries', 'issues', 'issue',
         'supreme court', 'governor', 'mayor', 'legislation', 'political', 'partisan',
         'white house', 'administration', 'federal', 'state', 'local government',
+        'debt ceiling', 'negotiation', 'shutdown', 'budget', 'appropriations', 'default',
+        'fiscal', 'stimulus', 'bipartisan', 'bipartisanship'
     ]
     question_lower = question.lower()
-    return any(keyword in question_lower for keyword in political_keywords)
+    for keyword in political_keywords:
+        if ' ' in keyword:
+            if keyword in question_lower:
+                return True
+        else:
+            if re.search(r'\b' + re.escape(keyword) + r'\b', question_lower):
+                return True
+    if re.search(r'\b(act|bill|resolution|amendment)\b', question_lower):
+        return True
+    return False
 
 def is_partisan_topic(question: str) -> bool:
     """
@@ -293,6 +347,24 @@ def is_partisan_topic(question: str) -> bool:
     q = question.lower()
     return any(k in q for k in partisan_keywords)
 
+def is_officeholder_question(question: str) -> bool:
+    q = question.lower().strip()
+    q = re.sub(r'[?.!]+$', '', q)  # Remove trailing punctuation
+    patterns = [
+        r"who is (the )?(president|vice president|speaker of the house|senate majority leader|governor|mayor|prime minister|chancellor) of( the)?( .*)?",
+        r"current (president|vice president|speaker|leader|governor|mayor|prime minister|chancellor) of( the)?( .*)?"
+    ]
+    return any(re.match(p, q) for p in patterns)
+
+def filter_legislation_by_year(legislations, year):
+    if not year:
+        return legislations
+    filtered = [
+        leg for leg in legislations
+        if year in (leg.get("date","") + leg.get("introducedOn",""))
+    ]
+    return filtered or legislations
+
 # --- Response Synthesis ---
 def synthesize_response(question: str, articles: List[Dict[str, Any]], legislation: List[Dict[str, Any]]) -> str:
     api_key = os.getenv("OPENAI_API_KEY")
@@ -301,14 +373,12 @@ def synthesize_response(question: str, articles: List[Dict[str, Any]], legislati
 
     # System prompt for neutrality, citation, and multi-perspective analysis
     system_prompt = (
-        "You are a political events AI assistant. Your job is to answer only questions about political events. "
-        "For every answer:\n"
-        "- Use only verifiable facts from reputable sources (news APIs, government data, etc.).\n"
-        "- Provide proper citations (with URLs) for every factual claim.\n"
-        "- On partisan issues, always present both Republican and Democratic viewpoints, clearly separated and neutrally worded.\n"
-        "- Explicitly check for and correct any partisan language or framing.\n"
-        "- If you cannot maintain strict neutrality or provide citations for every claim, politely refuse to answer.\n"
-        "- If a question is not about political events, politely refuse and explain your scope.\n"
+        "You are a political events AI assistant. Your job is to answer questions about political events. "
+        "Use the most relevant and recent articles and sources available, even if they do not address the question directly. "
+        "If no article addresses the question exactly, synthesize an answer from the closest available information, and clearly state any limitations. "
+        "- Provide proper citations (with URLs) for every factual claim you make.\n"
+        "- On partisan issues, present both Republican and Democratic viewpoints, clearly separated and neutrally worded.\n"
+        "- If you cannot provide a fully accurate answer, explain the limitations and do your best with the available sources.\n"
         "- Never make up facts or hallucinate information. If you cannot verify something, say so.\n"
         "- For legislative, election, or court questions, include dates, vote counts, and official statements where possible.\n"
         "- Always maintain strict neutrality and avoid partisan framing.\n"
@@ -316,7 +386,6 @@ def synthesize_response(question: str, articles: List[Dict[str, Any]], legislati
     )
 
     # Prepare context for the model (include articles/legislation as context if available)
-    # print("Articles passed to LLM:", articles)
     context = ""
     if articles:
         context += "Relevant news articles:\n"
@@ -497,73 +566,343 @@ def score_fact_confidence(articles: list, response: str) -> dict:
     return {}
 
 # --- Main Chatbot Logic ---
+def filter_us_articles(articles, user_input):
+    # If user explicitly mentions another country, don't filter
+    non_us_countries = [
+        "canada", "uk", "britain", "england", "australia", "germany", "france", "china", "india", "mexico", "russia", "japan", "brazil", "italy", "spain", "europe", "european union", "eu", "africa", "asia", "middle east", "iran", "iraq", "syria", "turkey", "israel", "palestine", "ukraine", "poland", "sweden", "norway", "finland", "denmark", "netherlands", "switzerland", "austria", "belgium", "ireland", "scotland", "wales", "new zealand", "south africa", "egypt", "saudi arabia", "uae", "argentina", "chile", "colombia", "venezuela", "peru", "cuba", "haiti", "dominican republic", "jamaica", "pakistan", "afghanistan", "north korea", "south korea", "taiwan", "hong kong", "singapore", "malaysia", "indonesia", "philippines", "thailand", "vietnam", "cambodia", "laos", "myanmar", "mongolia", "kazakhstan", "uzbekistan", "turkmenistan", "kyrgyzstan", "tajikistan", "georgia", "armenia", "azerbaijan", "greece", "portugal", "croatia", "serbia", "bosnia", "montenegro", "albania", "macedonia", "slovenia", "slovakia", "czech", "hungary", "romania", "bulgaria", "estonia", "latvia", "lithuania", "belarus", "moldova", "luxembourg", "liechtenstein", "monaco", "andorra", "san marino", "vatican", "malta", "cyprus", "iceland", "greenland", "antarctica", "fiji", "tonga", "samoa", "papua", "guinea", "new caledonia", "solomon islands", "vanuatu", "micronesia", "palau", "marshall islands", "kiribati", "nauru", "tuvalu", "seychelles", "mauritius", "madagascar", "comoros", "cape verde", "sao tome", "principe", "gabon", "congo", "zambia", "zimbabwe", "botswana", "namibia", "angola", "mozambique", "malawi", "tanzania", "kenya", "uganda", "rwanda", "burundi", "sudan", "south sudan", "ethiopia", "somalia", "djibouti", "eritrea", "morocco", "algeria", "tunisia", "libya", "nigeria", "ghana", "ivory coast", "senegal", "mali", "burkina", "niger", "benin", "togo", "sierra leone", "liberia", "guinea", "gambia", "cameroon", "central african republic", "chad", "equatorial guinea", "guinea-bissau", "lesotho", "swaziland", "eswatini", "mauritania", "western sahara", "sudan", "yemen", "oman", "qatar", "bahrain", "kuwait", "jordan", "lebanon", "syria", "iraq", "iran", "afghanistan", "pakistan", "bangladesh", "sri lanka", "nepal", "bhutan", "maldives", "mongolia", "north korea", "south korea", "taiwan", "hong kong", "macau", "china", "japan", "philippines", "vietnam", "thailand", "myanmar", "cambodia", "laos", "malaysia", "singapore", "indonesia", "brunei", "timor-leste", "australia", "new zealand", "fiji", "papua new guinea", "solomon islands", "vanuatu", "samoa", "tonga", "tuvalu", "kiribati", "nauru", "palau", "micronesia", "marshall islands", "palestine"
+    ]
+    if any(country in user_input.lower() for country in non_us_countries):
+        return articles
+    us_keywords = [
+        "united states", "u.s.", "us ", "america", "american", "congress", "senate", "house", "president", "biden", "trump", "white house", "federal", "washington", "democrat", "republican", "gop"
+    ]
+    filtered = []
+    for art in articles:
+        text = (art.get('title', '') + ' ' + art.get('summary', '') + ' ' + art.get('content', '')).lower()
+        if any(kw in text for kw in us_keywords):
+            filtered.append(art)
+    # Only return US-related articles, never fall back to all articles
+    return filtered
+
+def extract_target_year(user_input):
+    import re
+    # Look for a 4-digit year in the user input
+    match = re.search(r"\b(20\d{2})\b", user_input)
+    if match:
+        return match.group(1)
+    return None
+
+def remove_year_from_query(query):
+    import re
+    return re.sub(r"\b20\d{2}\b", "", query).strip()
+
+def filter_articles_by_year(articles, year):
+    if not year:
+        print("[DEBUG] No year found in query; skipping year filtering.")
+        return articles, False
+    filtered = []
+    print(f"[DEBUG] Filtering articles for year: {year}")
+    print("[DEBUG] All scraped articles before year filtering:")
+    for art in articles:
+        print(f"[DEBUG] Article: {art.get('title')} | Summary: {art.get('summary', '')}")
+        text = (art.get('title', '') + ' ' + art.get('summary', '') + ' ' + art.get('content', '')).lower()
+        if year in text:
+            print(f"[DEBUG] Including article for exact year {year}: {art.get('title')}")
+            filtered.append(art)
+    if filtered:
+        print(f"[DEBUG] Found {len(filtered)} articles with exact year {year}.")
+        return filtered, True
+    print("[DEBUG] No articles matched year; returning all scraped articles as last resort.")
+    return articles, False
+
 def chatbot_response(user_input: str) -> str:
+    # 1) Officeholder shortcut
+    if is_officeholder_question(user_input):
+        wiki = fetch_from_wikipedia(user_input)
+        if wiki:
+            return f"{wiki[0]['content']} (Source: {wiki[0]['url']})"
+        return "[No reputable sources found for that officeholder question.]"
+
+    # 2) Scope check
     if not is_political_question(user_input):
         return "I'm sorry, I can only answer questions about political events."
-    # Fetch data from APIs
-    articles = fetch_news_articles(user_input)
-    legislation = fetch_legislation_data(user_input)
-    # Synthesize response
-    response = synthesize_response(user_input, articles, legislation)
-    api_key = os.getenv("OPENAI_API_KEY")
-    warning = None
-    # Only run partisan language check for partisan topics
-    if is_partisan_topic(user_input):
-        if detect_partisan_language(response):
-            warning = "[Warning: The generated response may contain partisan language. Please rephrase your question or consult multiple sources.]\n"
-    # If no reputable sources found at all, return a clear message
-    if not articles and not legislation:
-        return "[No reputable sources or citations were found for your query. Please provide more context or check official legislative records.]"
-    # Citation check and regeneration
-    if not check_citations(response):
-        if api_key:
-            regenerated = regenerate_with_citations(user_input, articles, legislation, api_key)
-            if is_partisan_topic(user_input):
-                if detect_partisan_language(regenerated):
-                    warning = "[Warning: The regenerated response may contain partisan language. Please rephrase your question or consult multiple sources.]\n"
-            if not check_citations(regenerated):
-                # Show answer with inline warnings for uncited claims
-                inline = inline_flag_unverified_claims(regenerated)
-                return (warning or "") + inline
-            if is_partisan_topic(user_input):
-                if not check_perspective_balance(regenerated):
-                    return (warning or "") + "[Warning: The regenerated response may not present both Republican and Democratic perspectives. Please seek additional viewpoints.]"
-            unverified = flag_unverified_claims(regenerated)
-            if unverified:
-                inline = inline_flag_unverified_claims(regenerated)
-                return (warning or "") + inline
-            # Secondary LLM review step for regenerated answer
-            review_result = secondary_llm_review(regenerated, api_key)
-            if review_result != "PASS":
-                return (warning or "") + f"[LLM Review Warning or Correction]:\n{review_result}"
-            return (warning or "") + regenerated
-        else:
-            inline = inline_flag_unverified_claims(response)
-            return (warning or "") + inline
-    if is_partisan_topic(user_input):
-        if not check_perspective_balance(response):
-            return (warning or "") + "[Warning: The response may not present both Republican and Democratic perspectives. Please seek additional viewpoints.]"
-    unverified = flag_unverified_claims(response)
-    if unverified:
-        inline = inline_flag_unverified_claims(response)
-        return (warning or "") + inline
-    # Secondary LLM review step
-    if api_key:
-        review_result = secondary_llm_review(response, api_key)
-        if review_result != "PASS":
-            return (warning or "") + f"[LLM Review Warning or Correction]:\n{review_result}"
-    return (warning or "") + response
 
-# --- CLI for Testing (to be replaced by Gradio UI) ---
-def main():
-    print("Welcome to the Political AI Chatbot! Ask me any question about political events.")
+    # 3) Fetch from all APIs
+    articles    = fetch_news_articles(user_input)
+    legislation = fetch_legislation_data(user_input)
+
+    # Filter for US articles only
+    articles = filter_us_articles(articles, user_input)
+
+    # 4) Year‐filter both streams
+    year = extract_target_year(user_input)            # e.g. "2023"
+    if year:
+        articles, _    = filter_articles_by_year(articles, year)
+        legislation    = filter_legislation_by_year(legislation, year)
+        # Filter again after year filtering
+        articles = filter_us_articles(articles, user_input)
+
+    # 5) If zero API articles → scrape news sites
+    if not articles:
+        scraped = []
+        for fn in (
+            scrape_reuters_headlines,
+            scrape_apnews_headlines,
+            scrape_bbc_headlines,
+            scrape_nytimes_headlines,
+            scrape_aljazeera_headlines
+        ):
+            try:
+                scraped.extend(fn(user_input))
+            except Exception:
+                pass
+
+        # apply year filter to those scraped headlines
+        articles, _ = filter_articles_by_year(scraped, year)
+        # Filter for US articles only after scraping
+        articles = filter_us_articles(articles, user_input)
+
+    # INSERT the Wikipedia fallback for "key issue" questions right here:
+    if "key issue" in user_input.lower():
+        wiki_ctx = try_api_call(
+            fetch_from_wikipedia,
+            "2024 United States presidential primary key issues"
+        )
+        if wiki_ctx:
+            # tack on the 2-sentence summary so the LLM has something to cite
+            articles.extend(wiki_ctx)
+        # Filter for US articles only after Wikipedia fallback
+        articles = filter_us_articles(articles, user_input)
+
+    # 6) Final bail-out if BOTH streams are still empty
+    if not articles and not legislation:
+        return "[No reputable sources or citations were found for your query.]"
+
+    # 7) Generate the answer via LLM
+    answer = synthesize_response(user_input, articles, legislation)
+  
+    return answer
+
+def main(user_input):
     while True:
-        user_input = input("You: ")
+        # user_input = input("You: ")
         if user_input.lower() in ["exit", "quit", "bye"]:
             print("Goodbye!")
             break
         response = chatbot_response(user_input)
-        print(response)
+        return response
+
+def scrape_senate_recent_votes() -> List[Dict[str, str]]:
+    try:
+        url = "https://www.senate.gov/legislative/LIS/roll_call_lists/vote_menu_118_1.htm"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        resp = requests.get(url, headers=headers)
+        if resp.status_code != 200:
+            return []
+        soup = BeautifulSoup(resp.text, "html.parser")
+        votes = []
+        for row in soup.select('table.voteList tr')[1:]:  # skip header
+            cells = row.find_all('td') if isinstance(row, Tag) else []
+            if len(cells) >= 5:
+                vote_number = cells[0].get_text(strip=True)
+                date = cells[1].get_text(strip=True)
+                result = cells[2].get_text(strip=True)
+                title = cells[3].get_text(strip=True)
+                link_tag = None
+                cell3 = cells[3]
+                if isinstance(cell3, Tag):
+                    link_tag = cell3.find('a')
+                url = "https://www.senate.gov" + str(link_tag['href']) if isinstance(link_tag, Tag) and link_tag.has_attr('href') else ""
+                votes.append({
+                    'vote_number': vote_number,
+                    'date': date,
+                    'result': result,
+                    'title': title,
+                    'url': url
+                })
+        return votes
+    except Exception as e:
+        print(f"[DEBUG] Senate.gov scraping error: {e}")
+        return []
+
+def scrape_house_recent_votes() -> List[Dict[str, str]]:
+    try:
+        url = "https://clerk.house.gov/Votes"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        resp = requests.get(url, headers=headers)
+        if resp.status_code != 200:
+            return []
+        soup = BeautifulSoup(resp.text, "html.parser")
+        votes = []
+        for row in soup.select('table.votestable tbody tr'):
+            cells = row.find_all('td') if isinstance(row, Tag) else []
+            if len(cells) >= 5:
+                vote_number = cells[0].get_text(strip=True)
+                date = cells[1].get_text(strip=True)
+                result = cells[2].get_text(strip=True)
+                title = cells[3].get_text(strip=True)
+                link_tag = None
+                cell0 = cells[0]
+                if isinstance(cell0, Tag):
+                    link_tag = cell0.find('a')
+                url = "https://clerk.house.gov" + str(link_tag['href']) if isinstance(link_tag, Tag) and link_tag.has_attr('href') else ""
+                votes.append({
+                    'vote_number': vote_number,
+                    'date': date,
+                    'result': result,
+                    'title': title,
+                    'url': url
+                })
+        return votes
+    except Exception as e:
+        print(f"[DEBUG] House.gov scraping error: {e}")
+        return []
+
+def scrape_reuters_headlines(query: str) -> List[Dict[str, str]]:
+    try:
+        url = f"https://www.reuters.com/site-search/?query={query.replace(' ', '+')}"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        resp = requests.get(url, headers=headers)
+        if resp.status_code != 200:
+            return []
+        soup = BeautifulSoup(resp.text, "html.parser")
+        articles = []
+        for item in soup.find_all('div', class_='search-result-content'):
+            title = item.find('h3') if isinstance(item, Tag) else None
+            link = item.find('a') if isinstance(item, Tag) else None
+            summary = item.find('p') if isinstance(item, Tag) else None
+            if isinstance(title, Tag) and isinstance(link, Tag) and link.has_attr('href'):
+                articles.append({
+                    'title': title.get_text(strip=True),
+                    'url': "https://www.reuters.com" + str(link['href']),
+                    'summary': summary.get_text(strip=True) if isinstance(summary, Tag) else ""
+                })
+        return articles
+    except Exception as e:
+        print(f"[DEBUG] Reuters scraping error: {e}")
+        return []
+
+def scrape_apnews_headlines(query: str) -> List[Dict[str, str]]:
+    try:
+        url = f"https://apnews.com/search?q={query.replace(' ', '%20')}"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        resp = requests.get(url, headers=headers)
+        if resp.status_code != 200:
+            return []
+        soup = BeautifulSoup(resp.text, "html.parser")
+        articles = []
+        for item in soup.find_all('div', class_='SearchResults-item'):
+            title_tag = item.find('a', class_='Component-headline') if isinstance(item, Tag) else None
+            summary_tag = item.find('div', class_='Component-content') if isinstance(item, Tag) else None
+            if isinstance(title_tag, Tag) and title_tag.has_attr('href'):
+                href = str(title_tag['href'])
+                articles.append({
+                    'title': title_tag.get_text(strip=True),
+                    'url': "https://apnews.com" + href,
+                    'summary': summary_tag.get_text(strip=True) if isinstance(summary_tag, Tag) else ""
+                })
+        return articles
+    except Exception as e:
+        print(f"[DEBUG] AP News scraping error: {e}")
+        return []
+
+def scrape_bbc_headlines(query: str) -> List[Dict[str, str]]:
+    try:
+        url = f"https://www.bbc.co.uk/search?q={query.replace(' ', '+')}"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        resp = requests.get(url, headers=headers)
+        if resp.status_code != 200:
+            return []
+        soup = BeautifulSoup(resp.text, "html.parser")
+        articles = []
+        for item in soup.find_all('article', class_='css-8tq3w8-Stack e1y4nx260'):
+            title_tag = item.find('a', class_='css-1aofmbn-PromoLink e1f5wbog0') if isinstance(item, Tag) else None
+            summary_tag = item.find('p') if isinstance(item, Tag) else None
+            if isinstance(title_tag, Tag) and title_tag.has_attr('href'):
+                href = str(title_tag['href'])
+                url_full = href if href.startswith('http') else f"https://www.bbc.co.uk{href}"
+                articles.append({
+                    'title': title_tag.get_text(strip=True),
+                    'url': url_full,
+                    'summary': summary_tag.get_text(strip=True) if isinstance(summary_tag, Tag) else ""
+                })
+        return articles
+    except Exception as e:
+        print(f"[DEBUG] BBC scraping error: {e}")
+        return []
+
+def scrape_nytimes_headlines(query: str) -> List[Dict[str, str]]:
+    try:
+        url = f"https://www.nytimes.com/search?query={query.replace(' ', '%20')}"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        resp = requests.get(url, headers=headers)
+        if resp.status_code != 200:
+            return []
+        soup = BeautifulSoup(resp.text, "html.parser")
+        articles = []
+        for item in soup.find_all('li', attrs={'data-testid': 'search-bodega-result'}) or []:
+            title_tag = item.find('h4') if isinstance(item, Tag) else None
+            link_tag = item.find('a') if isinstance(item, Tag) else None
+            summary_tag = item.find('p') if isinstance(item, Tag) else None
+            if isinstance(title_tag, Tag) and isinstance(link_tag, Tag) and link_tag.has_attr('href'):
+                href = str(link_tag['href'])
+                url_full = href if href.startswith('http') else f"https://www.nytimes.com{href}"
+                articles.append({
+                    'title': title_tag.get_text(strip=True),
+                    'url': url_full,
+                    'summary': summary_tag.get_text(strip=True) if isinstance(summary_tag, Tag) else ""
+                })
+        return articles
+    except Exception as e:
+        print(f"[DEBUG] NYTimes scraping error: {e}")
+        return []
+
+def scrape_aljazeera_headlines(query: str) -> List[Dict[str, str]]:
+    try:
+        url = f"https://www.aljazeera.com/Search/?q={query.replace(' ', '%20')}"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        resp = requests.get(url, headers=headers)
+        if resp.status_code != 200:
+            return []
+        soup = BeautifulSoup(resp.text, "html.parser")
+        articles = []
+        for item in soup.find_all('div', class_='gc__content'):
+            title_tag = item.find('a', class_='u-clickable-card__link') if isinstance(item, Tag) else None
+            summary_tag = item.find('div', class_='gc__excerpt') if isinstance(item, Tag) else None
+            if isinstance(title_tag, Tag) and title_tag.has_attr('href'):
+                href = str(title_tag['href'])
+                url_full = href if href.startswith('http') else f"https://www.aljazeera.com{href}"
+                articles.append({
+                    'title': title_tag.get_text(strip=True),
+                    'url': url_full,
+                    'summary': summary_tag.get_text(strip=True) if isinstance(summary_tag, Tag) else ""
+                })
+        return articles
+    except Exception as e:
+        print(f"[DEBUG] Al Jazeera scraping error: {e}")
+        return []
 
 if __name__ == "__main__":
-    main()
+    # UI elements
+    st.header("News AI Chabot")
+    user_input = st.text_input("Enter Your Prompt")
+
+    if st.button("Response"):
+        start_time = time.time()
+        
+        with st.spinner("Processing..."):
+            response = main(user_input)
+        
+        end_time = time.time()
+        elapsed = int(end_time - start_time)
+
+        # Format time
+        if elapsed < 60:
+            st.success(f"Done in {elapsed} seconds.")
+        else:
+            minutes = elapsed // 60
+            seconds = elapsed % 60
+            st.success(f"Done in {minutes} minute(s) and {seconds} second(s).")
+        
+        # Show the response
+        st.write(response)
