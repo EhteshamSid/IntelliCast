@@ -1,2 +1,2 @@
 # Political-Events-AI-Assistant
-Chatbot for political news
+Chatbot for unbiased and cross-verified political news
