@@ -1,8 +1,5 @@
 # Political Events AI Assistant
 
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](#)
-[![License](https://img.shields.io/badge/license-MIT-blue)](#)
-
 A specialized chatbot that answers questions about political events with strict neutrality, balanced perspectives, and zero hallucinations.
 
 ---
