@@ -19,8 +19,6 @@ A specialized chatbot that answers questions about political events with strict 
 8. [Prompts & Neutrality Enforcement](#prompts--neutrality-enforcement)
 9. [Extensibility](#extensibility)
 10. [Troubleshooting](#troubleshooting)
-11. [Contributing](#contributing)
-12. [License](#license)
 
 ---
 
