@@ -14,7 +14,7 @@ A modern, personal project for answering political questions with strict neutral
 - **Bias Detection:** Warns if a response may be biased or missing citations.
 - **Multi-Session Chat:** Start, switch, and delete chat sessions. Each session has its own history and summary.
 - **Persistent History:** All chats are saved, so you never lose your conversations.
-- **Modern Web UI:** Responsive, ChatGPT-like interface with sidebar, chat bubbles, and a personal footer.
+- **Modern Web UI:** Responsive, simple interface with sidebar, chat bubbles, and a personal footer.
 - **API Integration:** Pulls data from OpenAI, NewsAPI, The Guardian, Brave Search, and Congress.gov (with more sources easy to add).
 
 ---
