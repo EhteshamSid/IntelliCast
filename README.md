@@ -2,7 +2,7 @@
 
 **Author: Ehtesham Siddiqui**
 
-A modern, personal project for answering political questions with strict neutrality, real citations, and multi-perspective analysis. This chatbot is designed to help users get balanced, up-to-date information about U.S. political events, policies, and debates — all with a clean, ChatGPT-style web interface and persistent chat history.
+A modern, personal project for answering political questions with strict neutrality, real citations, and multi-perspective analysis. This chatbot is designed to help users get balanced, up-to-date information about U.S. political events, policies, and debates — all with a clean, simple web interface and persistent chat history.
 
 ---
 
