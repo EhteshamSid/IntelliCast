@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Politics Chatbot</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="container">
+    <aside class="sidebar">
+        <h2>Chats</h2>
+        <div class="sidebar-actions">
+            <button id="new-chat">+ New chat</button>
+            <button id="summary-btn">Summarize</button>
+        </div>
+        <ul id="session-list"></ul>
+    </aside>
+    <main class="main">
+        <div class="header">
+            <h1>IntelliCast 2.O</h1>
+            <span id="session-title"></span>
+        </div>
+        <div id="chat-window" class="chat-window"></div>
+        <form id="chat-form" autocomplete="off">
+            <input type="text" id="chat-input" placeholder="Ask anything..." autocomplete="off" required>
+            <button type="submit">Send</button>
+        </form>
+        <div id="summary-modal" class="modal" style="display:none;">
+            <div class="modal-content">
+                <span class="close" id="close-summary">&times;</span>
+                <h3>Conversation Summary</h3>
+                <pre id="summary-content"></pre>
+            </div>
+        </div>
+        <footer class="footer">Built by Ehtesham Siddiqui</footer>
+    </main>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html> 
