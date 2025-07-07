@@ -35,8 +35,6 @@ A modern, personal project for answering political questions with strict neutral
    CONGRESS_API_KEY=your_congress_key_here
    FEC_API_KEY=your_fec_key_here
    SERPER_API_KEY=your_serper_key_here
-   BING_API_KEY=your_bing_key_here
-   REUTERS_API_KEY=your_reuters_key_here
    ```
    > Only the keys you provide will be used. The more you add, the richer the answers.
 
