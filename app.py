@@ -1,11 +1,11 @@
 from flask import Flask, request, jsonify, send_from_directory, render_template_string
 import uuid
 import os
-from politics_bot import PoliticsChatbotSimple
+from politics_bot import PoliticsChatbotAgentic
 import json
 
 app = Flask(__name__)
-chatbot = PoliticsChatbotSimple()
+chatbot = PoliticsChatbotAgentic()
 
 SESSIONS_FILE = 'sessions.json'
 

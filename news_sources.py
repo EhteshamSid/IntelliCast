@@ -7,6 +7,27 @@ import time
 from tenacity import retry, stop_after_attempt, wait_exponential
 from settings import Config
 import json
+from bs4 import BeautifulSoup
+
+def fetch_first_paragraph(url):
+    try:
+        resp = requests.get(url, timeout=5)
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        # Wikipedia: first <p> after the infobox
+        if 'wikipedia.org' in url:
+            paragraphs = soup.select('div.mw-parser-output > p')
+            for p in paragraphs:
+                text = p.get_text(strip=True)
+                if text:
+                    return text
+        # White House: first <p>
+        elif 'whitehouse.gov' in url:
+            p = soup.find('p')
+            if p:
+                return p.get_text(strip=True)
+    except Exception as e:
+        print(f"Error scraping {url}: {e}")
+    return ""
 
 class NewsAPIClient:
     def __init__(self):
@@ -140,6 +161,26 @@ class GovernmentAPIClient:
                 return data.get('bills', [])
             return []
 
+class FECAPIClient:
+    def __init__(self):
+        self.api_key = Config.FEC_API_KEY
+        self.base_url = "https://api.open.fec.gov/v1/"
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+    async def get_fec_data(self, query: str) -> List[Dict]:
+        if not self.api_key:
+            return []
+        params = {
+            'api_key': self.api_key,
+            'q': query,
+            'per_page': 10
+        }
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{self.base_url}search/", params=params)
+            if response.status_code == 200:
+                data = response.json()
+                return data.get('results', [])
+            return []
+
 class WebScraper:
     """Fallback web scraper for political news sources"""
     
@@ -168,39 +209,55 @@ class WebScraper:
         return results
 
 class DataAggregator:
-    """Aggregates data from multiple sources"""
-    
+    """Aggregates data from multiple sources asynchronously"""
     def __init__(self):
         self.news_client = NewsAPIClient()
         self.guardian_client = GuardianAPIClient()
         self.search_client = SerperSearchClient()
         self.brave_client = BraveSearchClient()
         self.gov_client = GovernmentAPIClient()
+        self.fec_client = FECAPIClient()  # Add FEC client if not present
         self.scraper = WebScraper()
-        
     async def get_comprehensive_political_data(self, query: str) -> Dict[str, Any]:
-        """Get political data from all available sources"""
         tasks = [
             self.news_client.get_political_news(query),
             self.guardian_client.get_political_news(query),
             self.search_client.search_political_info(query),
             self.brave_client.search_political_info(query),
             self.gov_client.get_congress_data(query),
+            self.fec_client.get_fec_data(query),
             self.scraper.scrape_political_news(query)
         ]
-        
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        return {
-            'news_articles': results[0] if not isinstance(results[0], Exception) else [],
-            'guardian_articles': results[1] if not isinstance(results[1], Exception) else [],
-            'search_results': results[2] if not isinstance(results[2], Exception) else [],
-            'brave_results': results[3] if not isinstance(results[3], Exception) else [],
-            'government_data': results[4] if not isinstance(results[4], Exception) else [],
-            'scraped_data': results[5] if not isinstance(results[5], Exception) else [],
-            'timestamp': datetime.now().isoformat(),
-            'query': query
+        news_articles = results[0] if not isinstance(results[0], Exception) else []
+        guardian_articles = results[1] if not isinstance(results[1], Exception) else []
+        search_results = results[2] if not isinstance(results[2], Exception) else []
+        brave_results = results[3] if not isinstance(results[3], Exception) else []
+        government_data = results[4] if not isinstance(results[4], Exception) else []
+        fec_data = results[5] if not isinstance(results[5], Exception) else []
+        scraped_data = results[6] if not isinstance(results[6], Exception) else []
+
+        data = {
+            'news_articles': news_articles,
+            'guardian_articles': guardian_articles,
+            'search_results': search_results,
+            'brave_results': brave_results,
+            'government_data': government_data,
+            'fec_data': fec_data,
         }
+        # Ensure search_results and brave_results are lists, not exceptions
+        search_results = search_results if isinstance(search_results, list) else []
+        brave_results = brave_results if isinstance(brave_results, list) else []
+        # Scrape Wikipedia/White House links for up-to-date info
+        scraped_summaries = []
+        for result in search_results + brave_results:
+            link = result.get('link') or result.get('url')
+            if link and ("wikipedia.org" in link or "whitehouse.gov" in link):
+                summary = fetch_first_paragraph(link)
+                if summary:
+                    scraped_summaries.append({'url': link, 'summary': summary})
+        data['scraped_summaries'] = scraped_summaries
+        return data
     
     def calculate_confidence_score(self, data: Dict[str, Any]) -> int:
         """Calculate confidence score based on data quality and source reliability"""
